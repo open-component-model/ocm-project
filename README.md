@@ -1,3 +1,5 @@
+[![REUSE status](https://api.reuse.software/badge/github.com/open-component-model/ocm-project)](https://api.reuse.software/info/github.com/open-component-model/ocm-project)
+
 # OCM Project Board
 
 This repository only contains issue related to the OCM project, no code. It is to seperate issues created by collaborators and OCM Core team members directly in the code repositories from issues created to be represented on the project board for agile planning purposes.
