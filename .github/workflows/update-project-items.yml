@@ -1,0 +1,39 @@
+name: Update Status of Project Items
+
+on:
+  schedule:
+    - cron: '5 23 * * 5' # Run every Friday at 23:05
+
+env:
+  GITHUB_ORGANIZATION: open-component-model
+  PROJECT_NUMBER: 10 #https://github.com/orgs/open-component-model/projects/10
+  STATUS_TO_UPDATE: Done
+  NEW_STATUS: Closed
+  OLDER_THAN_DAYS: 7
+
+jobs:
+
+  update-project-items:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Generate token
+      id: generate_token
+      uses: tibdex/github-app-token@v2
+      with:
+        app_id: ${{ secrets.OCMBOT_APP_ID }}
+        private_key: ${{ secrets.OCMBOT_PRIV_KEY }}
+    - name: Checkout
+      uses: actions/checkout@v4
+      with: 
+        token: ${{ steps.generate_token.outputs.token }}
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '21'
+    - name: Install Puppeteer
+      run: npm install puppeteer moment
+    - name: Update Project Items
+      run: node ./.github/workflows/update-project-item.js
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
