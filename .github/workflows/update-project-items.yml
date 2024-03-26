@@ -1,0 +1,26 @@
+name: Update Status of Project Items
+
+on:
+  schedule:
+    - cron: '5 23 * * 5' # Run every Friday at 23:05
+  workflow_dispatch: {} # Add ability to also trigger manually.
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  update-project-items:
+    runs-on: ubuntu-latest
+    steps:
+      - name: scan project
+        uses: skarlso/caretaker@v0.6.0
+        with:
+          command: scan-project
+          owner: open-component-model
+          isOrganization: true
+          projectNumber: 10 #https://github.com/orgs/open-component-model/projects/10
+          scanInterval: 168h
+          token: ${{ secrets.GITHUB_TOKEN }}
+          statusOption: Closed
+          fromStatusOption: Done
