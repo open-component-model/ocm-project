@@ -1,0 +1,32 @@
+name: Update Status of Project Items
+
+on:
+  schedule:
+    - cron: '5 23 * * 5' # Run every Friday at 23:05
+  workflow_dispatch: {} # Add ability to also trigger manually.
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  update-project-items:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate token
+        id: generate_token
+        uses: tibdex/github-app-token@v2
+        with:
+          app_id: ${{ secrets.OCMBOT_APP_ID }}
+          private_key: ${{ secrets.OCMBOT_PRIV_KEY }}
+      - name: scan project
+        uses: skarlso/caretaker@v0.6.0
+        with:
+          command: scan-project
+          owner: open-component-model
+          isOrganization: true
+          projectNumber: 10 #https://github.com/orgs/open-component-model/projects/10
+          scanInterval: 168h
+          token: ${{ steps.generate_token.outputs.token }}
+          statusOption: Closed
+          fromStatusOption: Done
