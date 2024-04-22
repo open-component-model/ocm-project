@@ -20,7 +20,7 @@ jobs:
           app_id: ${{ secrets.OCMBOT_APP_ID }}
           private_key: ${{ secrets.OCMBOT_PRIV_KEY }}
       - name: scan project
-        uses: skarlso/caretaker@v0.6.2
+        uses: skarlso/caretaker@v0.7.0
         with:
           command: scan-project
           owner: open-component-model
@@ -30,3 +30,4 @@ jobs:
           token: ${{ steps.generate_token.outputs.token }}
           statusOption: 🔒Closed
           fromStatusOption: 🍺 Done
+          moveClosed: true
