@@ -28,3 +28,4 @@ Dockerfile.cross
 # goreleaser resources
 dist/
 output/
+/.project

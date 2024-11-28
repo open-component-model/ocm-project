@@ -3,7 +3,6 @@ version: 2
 updates:
   - package-ecosystem: "github-actions"
     directory: "/"
-    labels: ["dependencies"]
     groups:
       # xref: https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file#groups
       ci:
@@ -12,12 +11,19 @@ updates:
     schedule:
       interval: "weekly"
       day: "sunday"
+    labels:
+      - kind/dependency
+      - kind/chore
+      - kind/skip-release-notes
+      - component/github-actions
   - package-ecosystem: "gomod"
     directory: "/"
-    labels: ["dependencies","go"]
     groups:
       go:
         update-types:  ["minor","patch"]
     schedule:
       interval: "weekly"
       day: "sunday"
+    labels:
+      - kind/dependency
+      - kind/chore
