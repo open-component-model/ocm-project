@@ -6,9 +6,10 @@ labels: kind/task
 assignees: ''
 ---
 
-**Description**
+**Description**:
 
-**Done Criteria**
+**Done Criteria**:
+
 - [ ] ...
 - [ ] Code has been reviewed by other team members
 - [ ] Internal technical Documentation created/updated

@@ -2,7 +2,7 @@
 name: Bug report
 about: Report a bug
 title: ""
-labels: kind/bug, kind/task
+labels: kind/bugfix
 assignees: ''
 ---
 
