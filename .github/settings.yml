@@ -4,5 +4,5 @@
 _extends: .github
 
 labels:
-- name: repo/ocm-k8s-toolkit
+- name: repo/ocm-project
   color: bfd4f2
