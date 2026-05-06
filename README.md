@@ -2,18 +2,36 @@
 
 # OCM Project Board
 
-This repository only contains issue related to the OCM project, no code. It is to seperate issues created by collaborators and OCM Core team members directly in the code repositories from issues created to be represented on the project board for agile planning purposes.
+This repository contains issues for agile planning purposes only — no code. It separates planning issues from those created directly in code repositories.
 
-## Support, Feedback, Contributing
+For the main development repository, see [Open Component Model](https://github.com/open-component-model/open-component-model).
 
-This project is open to feature requests/suggestions, bug reports etc. via GitHub issues in one of the respective repositories of the Open Component Model project. Contribution and feedback are encouraged and always welcome. For more information about how to contribute, the project structure, as well as additional contribution information, see our [Contribution Guidelines](CONTRIBUTING.md).
+## Projects
+
+| Repository | Description |
+|---|---|
+| [OCM Specification](https://github.com/open-component-model/ocm-spec) | The OCM specification |
+| [Open Component Model](https://github.com/open-component-model/open-component-model) | Go library, CLI, and Kubernetes toolkit |
+| [Open Delivery Gear](https://github.com/open-component-model/open-delivery-gear) | Compliance delivery engine |
+
+## Getting Started
+
+- [Documentation overview](https://ocm.software/docs/overview/)
+- [Getting Started guide](https://ocm.software/docs/getting-started/)
+
+## Contributing
+
+Contribution and feedback are encouraged and always welcome. For more information about how to contribute, see our [Contributing Guide](https://ocm.software/community/contributing/).
 
 ## Code of Conduct
 
-We as members, contributors, and leaders pledge to make participation in our community a harassment-free experience for everyone. By participating in this project, you agree to abide by its [Code of Conduct](CODE_OF_CONDUCT.md) at all times.
+OCM follows the [NeoNephos Code of Conduct](https://github.com/neonephos/.github/blob/main/CODE_OF_CONDUCT.md).
 
 ## Licensing
 
-Copyright 2024 SAP SE or an SAP affiliate company and Open Component Model contributors.
 Please see our [LICENSE](LICENSE) for copyright and license information.
-Detailed information including third-party components and their licensing/copyright information is available [via the REUSE tool](https://api.reuse.software/info/github.com/open-component-model/ocm).
+Detailed information including third-party components and their licensing/copyright information is available [via the REUSE tool](https://api.reuse.software/info/github.com/open-component-model/ocm-project).
+
+---
+
+<p align="center"><img alt="Bundesministerium für Wirtschaft und Energie (BMWE)-EU funding logo" src="https://apeirora.eu/assets/img/BMWK-EU.png" width="400"/></p>
