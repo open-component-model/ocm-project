@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   update-expired-sprints:
-    name: Move "Needs Refinement" issues with expired sprints to current sprint
+    name: Move issues with expired sprints to current sprint
     runs-on: ubuntu-24.04-arm
     steps:
       - name: Generate App Token
