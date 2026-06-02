@@ -25,7 +25,7 @@ Contribution and feedback are encouraged and always welcome. For more informatio
 
 ## Code of Conduct
 
-OCM follows the [NeoNephos Code of Conduct](https://github.com/neonephos/.github/blob/main/CODE_OF_CONDUCT.md).
+OCM follows the [Linux Foundation EU Code of Conduct](https://linuxfoundation.eu/policies/code-of-conduct).
 
 ## Licensing
 
