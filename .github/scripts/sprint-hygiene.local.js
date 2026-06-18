@@ -5,7 +5,7 @@
  * Local runner for sprint-hygiene.js.
  *
  * Usage:
- *   node sprint-hygiene.local.js [--apply] [--limit <n>] [--project <number>] [--org <name>]
+ *   node sprint-hygiene.local.js [--apply] [--limit <n>] [--plan <path>] [--project <number>] [--org <name>] [--allowed-project-number <number>]
  *
  * Runs in dry-run mode by default. Pass --apply to actually update sprints.
  * Use --limit to cap how many items are updated (useful for testing).
@@ -13,7 +13,8 @@
  */
 
 import { graphql } from "@octokit/graphql";
-import updateExpiredSprints from "./sprint-hygiene.js";
+import { writeFile } from "node:fs/promises";
+import { applySprintHygienePlan, collectSprintHygienePlan, DEFAULT_ALLOWED_PROJECT_NUMBER } from "./sprint-hygiene.js";
 
 const args = process.argv.slice(2);
 
@@ -37,9 +38,11 @@ if (!token) {
 
 const org = option("org", "open-component-model");
 const projectNumber = Number(option("project", "10"));
+const allowedProjectNumber = Number(option("allowed-project-number", DEFAULT_ALLOWED_PROJECT_NUMBER));
 const dryRun = !flag("apply"); // dry-run by default, --apply to mutate
 
 const limitArg = option("limit", undefined);
+const planPath = option("plan", undefined);
 let limit;
 if (limitArg !== undefined) {
   limit = parseInt(limitArg, 10);
@@ -54,6 +57,9 @@ if (dryRun) {
 }
 if (limit !== undefined) {
   console.log(`Limiting updates to ${limit} item(s)\n`);
+}
+if (planPath !== undefined) {
+  console.log(`Writing collected plan to ${planPath}\n`);
 }
 
 const graphqlWithAuth = graphql.defaults({
@@ -73,4 +79,10 @@ const core = {
 
 const context = { repo: { owner: org } };
 
-await updateExpiredSprints({ github, core, context, projectNumber, dryRun, limit });
+const plan = await collectSprintHygienePlan({ github, core, context, projectNumber, limit, allowedProjectNumber });
+if (planPath !== undefined && plan) {
+  await writeFile(planPath, `${JSON.stringify(plan, null, 2)}\n`);
+}
+if (plan) {
+  await applySprintHygienePlan({ github, core, plan, dryRun });
+}

@@ -4,6 +4,16 @@ on:
   schedule:
     - cron: '0 3 * * *' # Every night at 3 AM UTC
   workflow_dispatch:
+    inputs:
+      apply:
+        description: Apply the collected sprint hygiene plan
+        required: true
+        type: boolean
+        default: false
+      limit:
+        description: Optional cap per hygiene rule for testing
+        required: false
+        type: number
 
 permissions:
   contents: read
@@ -15,7 +25,7 @@ concurrency:
 
 jobs:
   update-expired-sprints:
-    name: Move issues with expired sprints to current sprint
+    name: Sprint hygiene
     runs-on: ubuntu-24.04-arm
     steps:
       - name: Generate App Token
@@ -30,9 +40,40 @@ jobs:
           sparse-checkout: .github/scripts
           persist-credentials: false
 
-      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+      - name: Collect sprint hygiene plan
+        id: collect
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           github-token: ${{ steps.get_token.outputs.token }}
           script: |
+            const fs = await import('node:fs/promises');
             const script = await import('${{ github.workspace }}/.github/scripts/sprint-hygiene.js');
-            await script.default({ github, core, context, projectNumber: 10 });
+            const limit = '${{ inputs.limit }}' === '' ? undefined : Number('${{ inputs.limit }}');
+            const plan = await script.collectSprintHygienePlan({
+              github,
+              core,
+              context,
+              projectNumber: 10,
+              limit,
+              allowedProjectNumber: script.DEFAULT_ALLOWED_PROJECT_NUMBER,
+            });
+            await fs.writeFile('${{ github.workspace }}/sprint-hygiene-plan.json', `${JSON.stringify(plan, null, 2)}\n`);
+            core.setOutput('planned', String(plan?.totalPlanned ?? 0));
+
+      - name: Upload sprint hygiene plan
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: sprint-hygiene-plan
+          path: sprint-hygiene-plan.json
+          if-no-files-found: error
+
+      - name: Execute sprint hygiene plan
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          github-token: ${{ steps.get_token.outputs.token }}
+          script: |
+            const fs = await import('node:fs/promises');
+            const script = await import('${{ github.workspace }}/.github/scripts/sprint-hygiene.js');
+            const plan = JSON.parse(await fs.readFile('${{ github.workspace }}/sprint-hygiene-plan.json', 'utf8'));
+            const dryRun = ${{ github.event_name == 'workflow_dispatch' && !inputs.apply }};
+            await script.applySprintHygienePlan({ github, core, plan, dryRun });
