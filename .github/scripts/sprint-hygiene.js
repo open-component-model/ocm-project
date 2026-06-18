@@ -417,35 +417,26 @@ async function tryAddComment(github, core, commentedIssueIds, { action }) {
 }
 
 /**
- * @param {{ graphql: Function }} github - GitHub GraphQL client
  * @param {{ info: Function, warning: Function }} core - Logger compatible with @actions/core
  * @param {object} args
  * @param {Array<object>} args.actions
  * @param {string} args.ruleName
- * @param {boolean} args.dryRun
- * @param {Set<string>} args.commentedIssueIds
  * @param {(action: object) => Promise<void>} args.applyAction
- * @returns {Promise<{ updated: number, failed: number }>}
+ * @returns {Promise<{ processed: number, failed: number }>}
  */
-async function processActions(github, core, {
+async function processActions(core, {
   actions,
   ruleName,
-  dryRun,
-  commentedIssueIds,
   applyAction,
 }) {
   if (actions.length === 0) {
     core.info("Nothing to update.");
-    return { updated: 0, failed: 0 };
+    return { processed: 0, failed: 0 };
   }
 
-  core.info(`${actions.length} item(s) selected for ${dryRun ? "dry-run update preview" : "update"}:`);
+  core.info(`${actions.length} item(s) selected:`);
 
-  if (dryRun) {
-    core.info("\n--- DRY RUN - no changes will be made ---");
-  }
-
-  let updated = 0;
+  let processed = 0;
   let failed = 0;
 
   for (const action of actions) {
@@ -453,28 +444,20 @@ async function processActions(github, core, {
     const title = action.item.title ?? "unknown";
     const itemRef = action.item.url ?? `#${number}`;
 
-    core.info(`${dryRun ? "Would update" : "Updating"} ${itemRef} - ${title}`);
+    core.info(`Selected ${itemRef} - ${title}`);
     core.info(`  ${action.description}`);
-
-    if (dryRun) {
-      updated += 1;
-      continue;
-    }
 
     try {
       await applyAction(action);
-      await tryAddComment(github, core, commentedIssueIds, { action });
-      core.info("  Done");
-      updated += 1;
+      processed += 1;
     } catch (err) {
       core.warning(`  #${number} failed: ${err.message}`);
       failed += 1;
     }
   }
 
-  const updateLabel = dryRun ? "would update" : "updated";
-  core.info(`\n${ruleName} summary: ${updated} ${updateLabel}, ${failed} failed`);
-  return { updated, failed };
+  core.info(`\n${ruleName} summary: ${processed} processed, ${failed} failed`);
+  return { processed, failed };
 }
 
 // -- Rules ----------------------------------------------------------------
@@ -744,31 +727,30 @@ export async function collectSprintHygienePlan({ github, core, context, projectN
   };
 }
 
-/**
- * @returns {Promise<Array<{ name: string, updated: number, failed: number }>>}
- */
 export async function applySprintHygienePlan({ github, core, plan, dryRun = false }) {
-  if (dryRun) core.info("Running in DRY-RUN mode - no changes will be made\n");
-
   const commentedIssueIds = new Set();
   const results = [];
+  const applyAction = dryRun
+    ? async () => {}
+    : async (action) => {
+        await applyPlannedMutation(github, action);
+        await tryAddComment(github, core, commentedIssueIds, { action });
+      };
 
   for (const rule of plan.rules ?? []) {
     core.info(`\n=== ${rule.name} ===`);
     if (rule.skipped) {
       core.info(`Skipped: ${rule.skipReason}`);
-      results.push({ name: rule.name, updated: 0, failed: 0 });
+      results.push({ name: rule.name, processed: 0, failed: 0 });
       continue;
     }
 
     results.push({
       name: rule.name,
-      ...await processActions(github, core, {
+      ...await processActions(core, {
         actions: rule.actions ?? [],
         ruleName: rule.name,
-        dryRun,
-        commentedIssueIds,
-        applyAction: (action) => applyPlannedMutation(github, action),
+        applyAction,
       }),
     });
   }
@@ -777,9 +759,8 @@ export async function applySprintHygienePlan({ github, core, plan, dryRun = fals
 
   core.info("\n========================================");
   core.info(`Sprint hygiene complete${dryRun ? " (DRY RUN - no changes were made)" : ""}:`);
-  const updateLabel = dryRun ? "would update" : "updated";
   for (const result of results) {
-    core.info(`  ${result.name}: ${result.updated} ${updateLabel}, ${result.failed} failed`);
+    core.info(`  ${result.name}: ${result.processed} processed, ${result.failed} failed`);
   }
 
   if (totalFailed > 0) {
