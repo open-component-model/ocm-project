@@ -5,11 +5,11 @@ on:
     - cron: '0 */4 * * *' # Every 4 hours
   workflow_dispatch:
     inputs:
-      apply:
-        description: Apply the collected sprint hygiene plan
+      dryRun:
+        description: Run without applying the collected sprint hygiene plan
         required: true
         type: boolean
-        default: false
+        default: true
       limit:
         description: Optional cap per hygiene rule for testing
         required: false
@@ -75,5 +75,5 @@ jobs:
             const fs = await import('node:fs/promises');
             const script = await import('${{ github.workspace }}/.github/scripts/sprint-hygiene.js');
             const plan = JSON.parse(await fs.readFile('${{ github.workspace }}/sprint-hygiene-plan.json', 'utf8'));
-            const dryRun = ${{ github.event_name == 'workflow_dispatch' && !inputs.apply }};
+            const dryRun = ${{ github.event_name == 'workflow_dispatch' && inputs.dryRun }};
             await script.applySprintHygienePlan({ github, core, plan, dryRun });
