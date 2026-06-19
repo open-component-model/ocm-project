@@ -1,6 +1,3 @@
-#!/usr/bin/env node
-// @ts-check
-
 /**
  * Local runner for sprint-hygiene.js.
  *
