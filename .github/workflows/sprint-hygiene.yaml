@@ -27,6 +27,9 @@ jobs:
   update-expired-sprints:
     name: Sprint hygiene
     runs-on: ubuntu-24.04-arm
+    environment:
+      name: automations
+      deployment: false
     steps:
       - name: Generate App Token
         id: get_token
