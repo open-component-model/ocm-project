@@ -10,32 +10,6 @@
 // -- Pure helpers (exported for testing) ----------------------------------
 
 /**
- * Pick the current sprint from a list of active iterations.
- * Falls back to the next upcoming sprint if none contains `today`.
- *
- * @param {Array<{id: string, title: string, startDate: string, duration: number}>} iterations
- * @param {string} today - ISO date string (YYYY-MM-DD)
- * @returns {{id: string, title: string, startDate: string, duration: number} | null}
- */
-export function findCurrentSprint(iterations, today) {
-  // Find the most recently started iteration that started on or before today.
-  const started = iterations
-    .filter((i) => i.startDate <= today)
-    .sort((a, b) => a.startDate.localeCompare(b.startDate));
-
-  if (started.length > 0) {
-    return started[started.length - 1];
-  }
-
-  // Nothing started yet — pick the nearest upcoming sprint.
-  const upcoming = iterations
-    .filter((i) => i.startDate > today)
-    .sort((a, b) => a.startDate.localeCompare(b.startDate));
-
-  return upcoming.length > 0 ? upcoming[0] : null;
-}
-
-/**
  * Pick the next upcoming sprint from a list of active iterations.
  *
  * @param {Array<{id: string, title: string, startDate: string, duration: number}>} iterations
