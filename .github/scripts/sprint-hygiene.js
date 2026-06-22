@@ -711,7 +711,7 @@ export async function applySprintHygienePlan({ github, core, plan, dryRun = fals
         await tryAddComment(github, core, commentedIssueIds, { action });
       };
 
-  for (const rule of plan.rules ?? []) {
+  for (const rule of plan?.rules ?? []) {
     core.info(`\n=== ${rule.name} ===`);
     if (rule.skipped) {
       core.info(`Skipped: ${rule.skipReason}`);
