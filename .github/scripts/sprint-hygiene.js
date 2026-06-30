@@ -10,6 +10,19 @@
 // -- Pure helpers (exported for testing) ----------------------------------
 
 /**
+ * Add a number of whole days to an ISO date string (YYYY-MM-DD).
+ *
+ * @param {string} isoDate - ISO date string (YYYY-MM-DD)
+ * @param {number} days
+ * @returns {string} ISO date string (YYYY-MM-DD)
+ */
+function addDays(isoDate, days) {
+  const date = new Date(`${isoDate}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().split("T")[0];
+}
+
+/**
  * Pick the next upcoming sprint from a list of active iterations.
  *
  * @param {Array<{id: string, title: string, startDate: string, duration: number}>} iterations
@@ -22,6 +35,24 @@ export function findNextSprint(iterations, today) {
     .sort((a, b) => a.startDate.localeCompare(b.startDate));
 
   return upcoming.length > 0 ? upcoming[0] : null;
+}
+
+/**
+ * Pick the sprint whose date range contains today, matching the GitHub
+ * Projects `@current` qualifier. The start date is inclusive and the end date
+ * (start + duration days) is exclusive, so the day a sprint ends already
+ * belongs to the following sprint.
+ *
+ * @param {Array<{id: string, title: string, startDate: string, duration: number}>} iterations
+ * @param {string} today - ISO date string (YYYY-MM-DD)
+ * @returns {{id: string, title: string, startDate: string, duration: number} | null}
+ */
+export function findCurrentSprint(iterations, today) {
+  const current = iterations.find(
+    (i) => i.startDate <= today && today < addDays(i.startDate, i.duration),
+  );
+
+  return current ?? null;
 }
 
 // -- Constants ------------------------------------------------------------
@@ -500,11 +531,19 @@ function plannedAction(rule, item) {
   };
 }
 
-function buildRules(config, targetSprint) {
-  const setTargetSprint = sprintChange({
+function buildRules(config, sprints) {
+  // Each rule decides where it moves items. Active work rolling off an expired
+  // sprint belongs in the *current* sprint so it stays on the active board,
+  // while refinement work is planned ahead in the *next* sprint.
+  const moveToCurrentSprint = sprintChange({
     projectId: config.projectId,
     sprintField: config.sprintField,
-    targetSprint,
+    targetSprint: sprints.current,
+  });
+  const moveToNextSprint = sprintChange({
+    projectId: config.projectId,
+    sprintField: config.sprintField,
+    targetSprint: sprints.next,
   });
   const setNeedsRefinement = statusChange({
     projectId: config.projectId,
@@ -524,10 +563,10 @@ function buildRules(config, targetSprint) {
         { reason: "closed GitHub issue", predicate: (item) => !isClosedIssue(item) },
         { reason: "Done/Closed project status", predicate: (item) => !isDoneOrClosedStatus(item) },
       ],
-      describeChange: setTargetSprint.describe,
+      describeChange: moveToCurrentSprint.describe,
       commentBody: (item) =>
-        `Sprint hygiene: automatically moved from **${item.sprint?.title ?? "none"}** to **${targetSprint.title}** because this issue had an expired sprint.`,
-      mutation: setTargetSprint.mutation,
+        `Sprint hygiene: automatically moved from **${item.sprint?.title ?? "none"}** to **${sprints.current.title}** because this issue had an expired sprint.`,
+      mutation: moveToCurrentSprint.mutation,
     },
     {
       name: "Mark unestimated items for refinement",
@@ -575,10 +614,10 @@ function buildRules(config, targetSprint) {
         { reason: "Done/Closed project status", predicate: (item) => !isDoneOrClosedStatus(item) },
         { reason: "not Needs Refinement", predicate: (item) => isNeedsRefinementStatus(item.status?.name) },
       ],
-      describeChange: setTargetSprint.describe,
+      describeChange: moveToNextSprint.describe,
       commentBody: (item) =>
-        `Sprint hygiene: automatically moved from **${item.sprint?.title ?? "none"}** to **${targetSprint.title}** because Needs Refinement items are planned in the next sprint.`,
-      mutation: setTargetSprint.mutation,
+        `Sprint hygiene: automatically moved from **${item.sprint?.title ?? "none"}** to **${sprints.next.title}** because Needs Refinement items are planned in the next sprint.`,
+      mutation: moveToNextSprint.mutation,
     },
   ];
 }
@@ -641,27 +680,40 @@ async function loadConfigAndRules(github, core, context, { projectNumber, limit 
   );
 
   const today = new Date().toISOString().split("T")[0];
-  const targetSprint = findNextSprint(config.sprintField.configuration.iterations, today);
+  const iterations = config.sprintField.configuration.iterations;
+  const nextSprint = findNextSprint(iterations, today);
 
-  if (!targetSprint) {
+  if (!nextSprint) {
     core.setFailed("Could not determine next sprint");
     return null;
   }
-  core.info(`Next sprint: ${targetSprint.title} (${targetSprint.id})`);
+  // Fall back to the next sprint if today falls in a gap between iterations so
+  // expired items still move somewhere sensible.
+  const currentSprint = findCurrentSprint(iterations, today) ?? nextSprint;
+  const sprints = { current: currentSprint, next: nextSprint };
+
+  core.info(`Current sprint: ${currentSprint.title} (${currentSprint.id})`);
+  core.info(`Next sprint:    ${nextSprint.title} (${nextSprint.id})`);
 
   return {
     config,
-    targetSprint,
-    rules: buildRules(config, targetSprint),
+    sprints,
+    rules: buildRules(config, sprints),
     metadata: {
       generatedAt: new Date().toISOString(),
       projectNumber,
       projectId: config.projectId,
-      targetSprint: {
-        id: targetSprint.id,
-        title: targetSprint.title,
-        startDate: targetSprint.startDate,
-        duration: targetSprint.duration,
+      currentSprint: {
+        id: currentSprint.id,
+        title: currentSprint.title,
+        startDate: currentSprint.startDate,
+        duration: currentSprint.duration,
+      },
+      nextSprint: {
+        id: nextSprint.id,
+        title: nextSprint.title,
+        startDate: nextSprint.startDate,
+        duration: nextSprint.duration,
       },
       limit: limit ?? null,
     },
