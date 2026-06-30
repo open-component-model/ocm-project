@@ -2,6 +2,7 @@ import assert from "assert";
 import {
   assertAllowedProjectNumber,
   DEFAULT_ALLOWED_PROJECT_NUMBER,
+  findCurrentSprint,
   findNextSprint,
   isBacklogHygieneStatus,
   isNeedsRefinementStatus,
@@ -57,6 +58,66 @@ console.log("Testing findNextSprint...");
 }
 
 console.log("  findNextSprint: all passed");
+
+// ----------------------------------------------------------
+// findCurrentSprint tests
+// ----------------------------------------------------------
+console.log("Testing findCurrentSprint...");
+
+{
+  const iterations = [
+    { id: "s1", title: "Sprint 1", startDate: "2026-04-07", duration: 14 },
+    { id: "s2", title: "Sprint 2", startDate: "2026-04-21", duration: 14 },
+    { id: "s3", title: "Sprint 3", startDate: "2026-05-05", duration: 14 },
+  ];
+
+  assert.strictEqual(
+    findCurrentSprint(iterations, "2026-04-25").id,
+    "s2",
+    "should pick the sprint whose range contains today",
+  );
+  assert.strictEqual(
+    findCurrentSprint(iterations, "2026-04-21").id,
+    "s2",
+    "start date is inclusive",
+  );
+  assert.strictEqual(
+    findCurrentSprint(iterations, "2026-05-04").id,
+    "s2",
+    "last day of the range still belongs to the sprint",
+  );
+  assert.strictEqual(
+    findCurrentSprint(iterations, "2026-05-05").id,
+    "s3",
+    "end date is exclusive - the next sprint's start day rolls over",
+  );
+}
+
+// Returns null when today is before all iterations
+{
+  const iterations = [
+    { id: "s1", title: "Sprint 1", startDate: "2026-05-01", duration: 14 },
+  ];
+  assert.strictEqual(
+    findCurrentSprint(iterations, "2026-04-25"),
+    null,
+    "should return null when today is before any sprint",
+  );
+}
+
+// Returns null when today is after all iterations (gap with no active sprint)
+{
+  const iterations = [
+    { id: "s1", title: "Sprint 1", startDate: "2026-03-01", duration: 14 },
+  ];
+  assert.strictEqual(
+    findCurrentSprint(iterations, "2026-04-25"),
+    null,
+    "should return null when no sprint range contains today",
+  );
+}
+
+console.log("  findCurrentSprint: all passed");
 
 // ----------------------------------------------------------
 // isBacklogHygieneStatus tests
