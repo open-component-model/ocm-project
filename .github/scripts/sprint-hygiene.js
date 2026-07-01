@@ -32,12 +32,11 @@ export function findNextSprint(iterations, today) {
 
 /**
  * Pick the sprint whose date range contains today, matching the GitHub
- * Projects `@current` qualifier. A sprint runs for `duration` days starting on
- * `startDate`, so today is current while `startDate <= today < startDate +
- * duration`. Since iterations are contiguous, that exclusive upper bound equals
- * the next sprint's start date: on the changeover day the next sprint is already
- * current (the current sprint's real last day, `startDate + duration - 1`, still
- * counts).
+ * Projects `@current` qualifier: `startDate <= today < startDate + duration`.
+ *
+ * Example - sprint starting 2026-06-30, duration 14 (runs 06-30 .. 07-13):
+ *   2026-07-13 -> current (last day of the sprint)
+ *   2026-07-14 -> next    (this is the following sprint's startDate)
  *
  * @param {SprintIteration[]} iterations
  * @param {string} today - ISO date string (YYYY-MM-DD)
