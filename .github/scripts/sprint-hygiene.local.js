@@ -11,21 +11,19 @@
 
 import { graphql } from "@octokit/graphql";
 import { writeFile } from "node:fs/promises";
+import { parseArgs } from "node:util";
 import { applySprintHygienePlan, collectSprintHygienePlan, DEFAULT_ALLOWED_PROJECT_NUMBER } from "./sprint-hygiene.js";
 
-const args = process.argv.slice(2);
-
-function flag(name) {
-  return args.includes(`--${name}`);
-}
-
-function option(name, fallback) {
-  const idx = args.indexOf(`--${name}`);
-  if (idx === -1 || !args[idx + 1] || args[idx + 1].startsWith("--")) {
-    return fallback;
-  }
-  return args[idx + 1];
-}
+const { values } = parseArgs({
+  options: {
+    apply: { type: "boolean", default: false },
+    limit: { type: "string" },
+    plan: { type: "string" },
+    project: { type: "string", default: "10" },
+    org: { type: "string", default: "open-component-model" },
+    "allowed-project-number": { type: "string", default: String(DEFAULT_ALLOWED_PROJECT_NUMBER) },
+  },
+});
 
 const token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
 if (!token) {
@@ -33,18 +31,17 @@ if (!token) {
   process.exit(1);
 }
 
-const org = option("org", "open-component-model");
-const projectNumber = Number(option("project", "10"));
-const allowedProjectNumber = Number(option("allowed-project-number", DEFAULT_ALLOWED_PROJECT_NUMBER));
-const dryRun = !flag("apply"); // dry-run by default, --apply to mutate
+const org = values.org;
+const projectNumber = Number(values.project);
+const allowedProjectNumber = Number(values["allowed-project-number"]);
+const dryRun = !values.apply; // dry-run by default, --apply to mutate
 
-const limitArg = option("limit", undefined);
-const planPath = option("plan", undefined);
+const planPath = values.plan;
 let limit;
-if (limitArg !== undefined) {
-  limit = parseInt(limitArg, 10);
+if (values.limit !== undefined) {
+  limit = Number.parseInt(values.limit, 10);
   if (!(limit > 0)) {
-    console.error(`Error: --limit must be a positive integer, got "${limitArg}"`);
+    console.error(`Error: --limit must be a positive integer, got "${values.limit}"`);
     process.exit(1);
   }
 }

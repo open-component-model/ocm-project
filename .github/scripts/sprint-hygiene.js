@@ -25,7 +25,7 @@
 export function findNextSprint(iterations, today) {
   const upcoming = iterations
     .filter((i) => i.startDate > today)
-    .sort((a, b) => a.startDate.localeCompare(b.startDate));
+    .sort((a, b) => (a.startDate < b.startDate ? -1 : a.startDate > b.startDate ? 1 : 0));
 
   return upcoming.length > 0 ? upcoming[0] : null;
 }
@@ -43,11 +43,11 @@ export function findNextSprint(iterations, today) {
  * @returns {SprintIteration | null}
  */
 export function findCurrentSprint(iterations, today) {
+  const now = new Date(today).getTime();
   const current = iterations.find((i) => {
-    const end = new Date(`${i.startDate}T00:00:00Z`);
-    end.setUTCDate(end.getUTCDate() + i.duration);
-    const endDate = end.toISOString().split("T")[0];
-    return i.startDate <= today && today < endDate;
+    const start = new Date(i.startDate).getTime();
+    const end = start + i.duration * 86_400_000; // duration in days -> ms
+    return start <= now && now < end;
   });
 
   return current ?? null;
