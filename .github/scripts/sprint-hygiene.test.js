@@ -8,76 +8,83 @@ import {
   isBacklogHygieneStatus,
   isNeedsRefinementStatus,
   isTerminalStatus,
+  parseIteration,
   projectFieldQueryToken,
 } from "./sprint-hygiene.js";
 
+// The helpers work on Date-based iterations; parse ISO fixtures the same way
+// the production code does at the GraphQL boundary. `d` builds a UTC-midnight
+// Date from an ISO date string, matching how `today` is compared.
+const iters = (...rows) => rows.map(parseIteration);
+const d = (isoDate) => new Date(isoDate);
+
 describe("findNextSprint", () => {
   test("returns the next sprint after the current sprint", () => {
-    const iterations = [
+    const iterations = iters(
       { id: "s1", title: "Sprint 1", startDate: "2026-04-07", duration: 14 },
       { id: "s2", title: "Sprint 2", startDate: "2026-04-21", duration: 14 },
       { id: "s3", title: "Sprint 3", startDate: "2026-05-05", duration: 14 },
-    ];
-    assert.equal(findNextSprint(iterations, "2026-04-25").id, "s3");
+    );
+    assert.equal(findNextSprint(iterations, d("2026-04-25")).id, "s3");
   });
 
   test("returns the sprint after today's starting sprint", () => {
-    const iterations = [
+    const iterations = iters(
       { id: "s1", title: "Sprint 1", startDate: "2026-04-07", duration: 14 },
       { id: "s2", title: "Sprint 2", startDate: "2026-04-21", duration: 14 },
       { id: "s3", title: "Sprint 3", startDate: "2026-05-05", duration: 14 },
-    ];
-    assert.equal(findNextSprint(iterations, "2026-04-21").id, "s3");
+    );
+    assert.equal(findNextSprint(iterations, d("2026-04-21")).id, "s3");
   });
 
   test("falls back to nearest upcoming sprint when today is before all iterations", () => {
-    const iterations = [
+    const iterations = iters(
       { id: "s1", title: "Sprint 1", startDate: "2026-05-01", duration: 14 },
       { id: "s2", title: "Sprint 2", startDate: "2026-05-15", duration: 14 },
-    ];
-    assert.equal(findNextSprint(iterations, "2026-04-25").id, "s1");
+    );
+    assert.equal(findNextSprint(iterations, d("2026-04-25")).id, "s1");
   });
 
   test("returns null when no upcoming sprint exists", () => {
-    const iterations = [
+    const iterations = iters(
       { id: "s1", title: "Sprint 1", startDate: "2026-03-01", duration: 14 },
       { id: "s2", title: "Sprint 2", startDate: "2026-03-15", duration: 14 },
-    ];
-    assert.equal(findNextSprint(iterations, "2026-04-25"), null);
+    );
+    assert.equal(findNextSprint(iterations, d("2026-04-25")), null);
   });
 });
 
 describe("findCurrentSprint", () => {
-  const iterations = [
+  const iterations = iters(
     { id: "s1", title: "Sprint 1", startDate: "2026-04-07", duration: 14 },
     { id: "s2", title: "Sprint 2", startDate: "2026-04-21", duration: 14 },
     { id: "s3", title: "Sprint 3", startDate: "2026-05-05", duration: 14 },
-  ];
+  );
 
   test("picks the sprint whose range contains today", () => {
-    assert.equal(findCurrentSprint(iterations, "2026-04-25").id, "s2");
+    assert.equal(findCurrentSprint(iterations, d("2026-04-25")).id, "s2");
   });
 
   test("start date is inclusive", () => {
-    assert.equal(findCurrentSprint(iterations, "2026-04-21").id, "s2");
+    assert.equal(findCurrentSprint(iterations, d("2026-04-21")).id, "s2");
   });
 
   test("last day of the range still belongs to the sprint", () => {
-    assert.equal(findCurrentSprint(iterations, "2026-05-04").id, "s2");
+    assert.equal(findCurrentSprint(iterations, d("2026-05-04")).id, "s2");
   });
 
   test("end date is exclusive - the next sprint's start day rolls over", () => {
-    assert.equal(findCurrentSprint(iterations, "2026-05-05").id, "s3");
+    assert.equal(findCurrentSprint(iterations, d("2026-05-05")).id, "s3");
   });
 
   test("returns null when today is before any sprint", () => {
-    const before = [{ id: "s1", title: "Sprint 1", startDate: "2026-05-01", duration: 14 }];
-    assert.equal(findCurrentSprint(before, "2026-04-25"), null);
+    const before = iters({ id: "s1", title: "Sprint 1", startDate: "2026-05-01", duration: 14 });
+    assert.equal(findCurrentSprint(before, d("2026-04-25")), null);
   });
 
   test("returns null when no sprint range contains today", () => {
-    const after = [{ id: "s1", title: "Sprint 1", startDate: "2026-03-01", duration: 14 }];
-    assert.equal(findCurrentSprint(after, "2026-04-25"), null);
+    const after = iters({ id: "s1", title: "Sprint 1", startDate: "2026-03-01", duration: 14 });
+    assert.equal(findCurrentSprint(after, d("2026-04-25")), null);
   });
 });
 

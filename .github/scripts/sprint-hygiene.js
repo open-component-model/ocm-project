@@ -10,22 +10,55 @@
 // -- Pure helpers (exported for testing) ----------------------------------
 
 /**
- * A single sprint iteration as returned by the Projects v2 GraphQL API.
+ * A sprint iteration as returned by the Projects v2 GraphQL API, where
+ * `startDate` is still an ISO date string (YYYY-MM-DD).
  *
- * @typedef {{ id: string, title: string, startDate: string, duration: number }} SprintIteration
+ * @typedef {{ id: string, title: string, startDate: string, duration: number }} RawSprintIteration
  */
+
+/**
+ * A sprint iteration normalized for internal use: `startDate` is a `Date`
+ * (UTC midnight) so the rest of the module compares and offsets real dates
+ * instead of juggling strings. Convert back to ISO only at the API/output edge.
+ *
+ * @typedef {{ id: string, title: string, startDate: Date, duration: number }} SprintIteration
+ */
+
+/**
+ * Parse a raw GraphQL iteration into the internal Date-based shape. ISO
+ * date-only strings parse as UTC midnight, so sprint boundaries stay in UTC.
+ *
+ * @param {RawSprintIteration} raw
+ * @returns {SprintIteration}
+ */
+export function parseIteration(raw) {
+  return { ...raw, startDate: new Date(raw.startDate) };
+}
+
+/**
+ * Add whole days to a `Date`, returning a new `Date` (UTC-based, no mutation).
+ *
+ * @param {Date} date
+ * @param {number} days
+ * @returns {Date}
+ */
+function addDays(date, days) {
+  const result = new Date(date);
+  result.setUTCDate(result.getUTCDate() + days);
+  return result;
+}
 
 /**
  * Pick the next upcoming sprint from a list of active iterations.
  *
  * @param {SprintIteration[]} iterations
- * @param {string} today - ISO date string (YYYY-MM-DD)
+ * @param {Date} today
  * @returns {SprintIteration | null}
  */
 export function findNextSprint(iterations, today) {
   const upcoming = iterations
     .filter((i) => i.startDate > today)
-    .sort((a, b) => (a.startDate < b.startDate ? -1 : a.startDate > b.startDate ? 1 : 0));
+    .sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
 
   return upcoming.length > 0 ? upcoming[0] : null;
 }
@@ -39,16 +72,13 @@ export function findNextSprint(iterations, today) {
  *   2026-07-14 -> next    (this is the following sprint's startDate)
  *
  * @param {SprintIteration[]} iterations
- * @param {string} today - ISO date string (YYYY-MM-DD)
+ * @param {Date} today
  * @returns {SprintIteration | null}
  */
 export function findCurrentSprint(iterations, today) {
-  const now = new Date(today).getTime();
-  const current = iterations.find((i) => {
-    const start = new Date(i.startDate).getTime();
-    const end = start + i.duration * 86_400_000; // duration in days -> ms
-    return start <= now && now < end;
-  });
+  const current = iterations.find(
+    (i) => i.startDate <= today && today < addDays(i.startDate, i.duration),
+  );
 
   return current ?? null;
 }
@@ -677,12 +707,14 @@ async function loadConfigAndRules(github, core, context, { projectNumber, limit 
     github, core, { org: context.repo.owner, projectNumber },
   );
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = new Date();
   // The GraphQL API returns camelCase iteration fields (startDate/duration);
-  // cast away the heuristic REST schema type inferred for `configuration`.
-  const iterations = /** @type {SprintIteration[]} */ (
+  // cast away the heuristic REST schema type inferred for `configuration`, then
+  // parse ISO strings into Dates once so the rest of the module works on Dates.
+  const rawIterations = /** @type {RawSprintIteration[]} */ (
     config.sprintField.configuration.iterations
   );
+  const iterations = rawIterations.map(parseIteration);
   const nextSprint = findNextSprint(iterations, today);
 
   if (!nextSprint) {
@@ -708,13 +740,13 @@ async function loadConfigAndRules(github, core, context, { projectNumber, limit 
       currentSprint: {
         id: currentSprint.id,
         title: currentSprint.title,
-        startDate: currentSprint.startDate,
+        startDate: currentSprint.startDate.toISOString().slice(0, 10),
         duration: currentSprint.duration,
       },
       nextSprint: {
         id: nextSprint.id,
         title: nextSprint.title,
-        startDate: nextSprint.startDate,
+        startDate: nextSprint.startDate.toISOString().slice(0, 10),
         duration: nextSprint.duration,
       },
       limit: limit ?? null,

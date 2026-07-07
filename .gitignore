@@ -30,3 +30,4 @@ dist/
 output/
 /.project
 node_modules
+.github/scripts/plan.json

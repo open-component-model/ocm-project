@@ -6,7 +6,9 @@
   },
   "scripts": {
     "test": "node --test sprint-hygiene.test.js ",
-    "lint": "eslint ."
+    "test:local": "node sprint-hygiene.local.js --plan plan.json",
+    "lint": "eslint .",
+    "lint:fix": "eslint --fix ."
   },
   "dependencies": {
     "@octokit/graphql": "9.0.3"
