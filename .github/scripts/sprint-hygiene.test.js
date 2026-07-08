@@ -1,141 +1,136 @@
-import assert from "assert";
+import { describe, test } from "node:test";
+import assert from "node:assert/strict";
 import {
   assertAllowedProjectNumber,
   DEFAULT_ALLOWED_PROJECT_NUMBER,
+  findCurrentSprint,
   findNextSprint,
   isBacklogHygieneStatus,
   isNeedsRefinementStatus,
   isTerminalStatus,
+  parseIteration,
   projectFieldQueryToken,
 } from "./sprint-hygiene.js";
 
-// ----------------------------------------------------------
-// findNextSprint tests
-// ----------------------------------------------------------
-console.log("Testing findNextSprint...");
+// The helpers work on Date-based iterations; parse ISO fixtures the same way
+// the production code does at the GraphQL boundary. `d` builds a UTC-midnight
+// Date from an ISO date string, matching how `today` is compared.
+const iters = (...rows) => rows.map(parseIteration);
+const d = (isoDate) => new Date(isoDate);
 
-// Returns the next sprint after the current sprint
-{
-  const iterations = [
+describe("findNextSprint", () => {
+  test("returns the next sprint after the current sprint", () => {
+    const iterations = iters(
+      { id: "s1", title: "Sprint 1", startDate: "2026-04-07", duration: 14 },
+      { id: "s2", title: "Sprint 2", startDate: "2026-04-21", duration: 14 },
+      { id: "s3", title: "Sprint 3", startDate: "2026-05-05", duration: 14 },
+    );
+    assert.equal(findNextSprint(iterations, d("2026-04-25")).id, "s3");
+  });
+
+  test("returns the sprint after today's starting sprint", () => {
+    const iterations = iters(
+      { id: "s1", title: "Sprint 1", startDate: "2026-04-07", duration: 14 },
+      { id: "s2", title: "Sprint 2", startDate: "2026-04-21", duration: 14 },
+      { id: "s3", title: "Sprint 3", startDate: "2026-05-05", duration: 14 },
+    );
+    assert.equal(findNextSprint(iterations, d("2026-04-21")).id, "s3");
+  });
+
+  test("falls back to nearest upcoming sprint when today is before all iterations", () => {
+    const iterations = iters(
+      { id: "s1", title: "Sprint 1", startDate: "2026-05-01", duration: 14 },
+      { id: "s2", title: "Sprint 2", startDate: "2026-05-15", duration: 14 },
+    );
+    assert.equal(findNextSprint(iterations, d("2026-04-25")).id, "s1");
+  });
+
+  test("returns null when no upcoming sprint exists", () => {
+    const iterations = iters(
+      { id: "s1", title: "Sprint 1", startDate: "2026-03-01", duration: 14 },
+      { id: "s2", title: "Sprint 2", startDate: "2026-03-15", duration: 14 },
+    );
+    assert.equal(findNextSprint(iterations, d("2026-04-25")), null);
+  });
+});
+
+describe("findCurrentSprint", () => {
+  const iterations = iters(
     { id: "s1", title: "Sprint 1", startDate: "2026-04-07", duration: 14 },
     { id: "s2", title: "Sprint 2", startDate: "2026-04-21", duration: 14 },
     { id: "s3", title: "Sprint 3", startDate: "2026-05-05", duration: 14 },
-  ];
-  const result = findNextSprint(iterations, "2026-04-25");
-  assert.strictEqual(result.id, "s3", "should pick Sprint 3 as the next sprint");
-}
+  );
 
-// Returns the sprint after today's starting sprint
-{
-  const iterations = [
-    { id: "s1", title: "Sprint 1", startDate: "2026-04-07", duration: 14 },
-    { id: "s2", title: "Sprint 2", startDate: "2026-04-21", duration: 14 },
-    { id: "s3", title: "Sprint 3", startDate: "2026-05-05", duration: 14 },
-  ];
-  const result = findNextSprint(iterations, "2026-04-21");
-  assert.strictEqual(result.id, "s3", "should pick the sprint after the one starting today");
-}
+  test("picks the sprint whose range contains today", () => {
+    assert.equal(findCurrentSprint(iterations, d("2026-04-25")).id, "s2");
+  });
 
-// Falls back to nearest upcoming sprint when today is before all iterations
-{
-  const iterations = [
-    { id: "s1", title: "Sprint 1", startDate: "2026-05-01", duration: 14 },
-    { id: "s2", title: "Sprint 2", startDate: "2026-05-15", duration: 14 },
-  ];
-  const result = findNextSprint(iterations, "2026-04-25");
-  assert.strictEqual(result.id, "s1", "should pick the nearest upcoming sprint");
-}
+  test("start date is inclusive", () => {
+    assert.equal(findCurrentSprint(iterations, d("2026-04-21")).id, "s2");
+  });
 
-// Returns null when no upcoming sprint exists
-{
-  const iterations = [
-    { id: "s1", title: "Sprint 1", startDate: "2026-03-01", duration: 14 },
-    { id: "s2", title: "Sprint 2", startDate: "2026-03-15", duration: 14 },
-  ];
-  const result = findNextSprint(iterations, "2026-04-25");
-  assert.strictEqual(result, null, "should return null when no upcoming sprint exists");
-}
+  test("last day of the range still belongs to the sprint", () => {
+    assert.equal(findCurrentSprint(iterations, d("2026-05-04")).id, "s2");
+  });
 
-console.log("  findNextSprint: all passed");
+  test("end date is exclusive - the next sprint's start day rolls over", () => {
+    assert.equal(findCurrentSprint(iterations, d("2026-05-05")).id, "s3");
+  });
 
-// ----------------------------------------------------------
-// isBacklogHygieneStatus tests
-// ----------------------------------------------------------
-console.log("Testing isBacklogHygieneStatus...");
+  test("returns null when today is before any sprint", () => {
+    const before = iters({ id: "s1", title: "Sprint 1", startDate: "2026-05-01", duration: 14 });
+    assert.equal(findCurrentSprint(before, d("2026-04-25")), null);
+  });
 
-assert.strictEqual(isBacklogHygieneStatus(undefined), true, "empty status is eligible");
-assert.strictEqual(isBacklogHygieneStatus("Needs Refinement"), true, "Needs Refinement is eligible");
-assert.strictEqual(isBacklogHygieneStatus("🛠️ Needs Refinement"), true, "emoji-prefixed Needs Refinement is eligible");
-assert.strictEqual(isBacklogHygieneStatus("TODO"), true, "TODO is eligible");
-assert.strictEqual(isBacklogHygieneStatus("🆕 ToDo"), true, "emoji-prefixed ToDo is eligible");
-assert.strictEqual(isBacklogHygieneStatus("In Progress"), false, "In Progress is not eligible");
-assert.strictEqual(isBacklogHygieneStatus("In Review"), false, "In Review is not eligible");
+  test("returns null when no sprint range contains today", () => {
+    const after = iters({ id: "s1", title: "Sprint 1", startDate: "2026-03-01", duration: 14 });
+    assert.equal(findCurrentSprint(after, d("2026-04-25")), null);
+  });
+});
 
-console.log("  isBacklogHygieneStatus: all passed");
+describe("isBacklogHygieneStatus", () => {
+  test("empty status is eligible", () => assert.equal(isBacklogHygieneStatus(undefined), true));
+  test("Needs Refinement is eligible", () => assert.equal(isBacklogHygieneStatus("Needs Refinement"), true));
+  test("emoji-prefixed Needs Refinement is eligible", () => assert.equal(isBacklogHygieneStatus("🛠️ Needs Refinement"), true));
+  test("TODO is eligible", () => assert.equal(isBacklogHygieneStatus("TODO"), true));
+  test("emoji-prefixed ToDo is eligible", () => assert.equal(isBacklogHygieneStatus("🆕 ToDo"), true));
+  test("In Progress is not eligible", () => assert.equal(isBacklogHygieneStatus("In Progress"), false));
+  test("In Review is not eligible", () => assert.equal(isBacklogHygieneStatus("In Review"), false));
+});
 
-// ----------------------------------------------------------
-// isTerminalStatus tests
-// ----------------------------------------------------------
-console.log("Testing isTerminalStatus...");
+describe("isTerminalStatus", () => {
+  test("Done is terminal", () => assert.equal(isTerminalStatus("Done"), true));
+  test("emoji-prefixed Done is terminal", () => assert.equal(isTerminalStatus("🍺 Done"), true));
+  test("Closed is terminal", () => assert.equal(isTerminalStatus("Closed"), true));
+  test("emoji-prefixed Closed is terminal", () => assert.equal(isTerminalStatus("🔒Closed"), true));
+  test("In Progress is not terminal", () => assert.equal(isTerminalStatus("In Progress"), false));
+  test("Review is not terminal", () => assert.equal(isTerminalStatus("Review"), false));
+});
 
-assert.strictEqual(isTerminalStatus("Done"), true, "Done is terminal");
-assert.strictEqual(isTerminalStatus("🍺 Done"), true, "emoji-prefixed Done is terminal");
-assert.strictEqual(isTerminalStatus("Closed"), true, "Closed is terminal");
-assert.strictEqual(isTerminalStatus("🔒Closed"), true, "emoji-prefixed Closed is terminal");
-assert.strictEqual(isTerminalStatus("In Progress"), false, "In Progress is not terminal");
-assert.strictEqual(isTerminalStatus("Review"), false, "Review is not terminal");
+describe("isNeedsRefinementStatus", () => {
+  test("Needs Refinement is matched", () => assert.equal(isNeedsRefinementStatus("Needs Refinement"), true));
+  test("emoji-prefixed Needs Refinement is matched", () => assert.equal(isNeedsRefinementStatus("🛠️ Needs Refinement"), true));
+  test("Next-UP is not Needs Refinement", () => assert.equal(isNeedsRefinementStatus("Next-UP"), false));
+  test("emoji-prefixed Next-UP is not Needs Refinement", () => assert.equal(isNeedsRefinementStatus("📋 Next-UP"), false));
+});
 
-console.log("  isTerminalStatus: all passed");
+describe("assertAllowedProjectNumber", () => {
+  test("matching project number should be allowed", () => {
+    assert.doesNotThrow(() => assertAllowedProjectNumber(DEFAULT_ALLOWED_PROJECT_NUMBER, DEFAULT_ALLOWED_PROJECT_NUMBER));
+  });
+  test("missing allowed project number should disable the guard", () => {
+    assert.doesNotThrow(() => assertAllowedProjectNumber(123, undefined));
+  });
+  test("mismatched project number should be rejected", () => {
+    assert.throws(() => assertAllowedProjectNumber(123, DEFAULT_ALLOWED_PROJECT_NUMBER), /unexpected project/);
+  });
+});
 
-// ----------------------------------------------------------
-// isNeedsRefinementStatus tests
-// ----------------------------------------------------------
-console.log("Testing isNeedsRefinementStatus...");
-
-assert.strictEqual(isNeedsRefinementStatus("Needs Refinement"), true, "Needs Refinement is matched");
-assert.strictEqual(isNeedsRefinementStatus("🛠️ Needs Refinement"), true, "emoji-prefixed Needs Refinement is matched");
-assert.strictEqual(isNeedsRefinementStatus("Next-UP"), false, "Next-UP is not Needs Refinement");
-assert.strictEqual(isNeedsRefinementStatus("📋 Next-UP"), false, "emoji-prefixed Next-UP is not Needs Refinement");
-
-console.log("  isNeedsRefinementStatus: all passed");
-
-// ----------------------------------------------------------
-// assertAllowedProjectNumber tests
-// ----------------------------------------------------------
-console.log("Testing assertAllowedProjectNumber...");
-
-assert.doesNotThrow(
-  () => assertAllowedProjectNumber(DEFAULT_ALLOWED_PROJECT_NUMBER, DEFAULT_ALLOWED_PROJECT_NUMBER),
-  "matching project number should be allowed",
-);
-assert.doesNotThrow(
-  () => assertAllowedProjectNumber(123, undefined),
-  "missing allowed project number should disable the guard",
-);
-assert.throws(
-  () => assertAllowedProjectNumber(123, DEFAULT_ALLOWED_PROJECT_NUMBER),
-  /unexpected project/,
-  "mismatched project number should be rejected",
-);
-
-console.log("  assertAllowedProjectNumber: all passed");
-
-// ----------------------------------------------------------
-// projectFieldQueryToken tests
-// ----------------------------------------------------------
-console.log("Testing projectFieldQueryToken...");
-
-assert.strictEqual(
-  projectFieldQueryToken("Story Points (Number)"),
-  "story-points-(number)",
-  "field display name should become the Projects search token",
-);
-assert.strictEqual(
-  projectFieldQueryToken("Story Points"),
-  "story-points",
-  "fallback field name should become the Projects search token",
-);
-
-console.log("  projectFieldQueryToken: all passed");
-
-console.log("\nAll sprint-hygiene tests passed.");
+describe("projectFieldQueryToken", () => {
+  test("field display name should become the Projects search token", () => {
+    assert.equal(projectFieldQueryToken("Story Points (Number)"), "story-points-(number)");
+  });
+  test("fallback field name should become the Projects search token", () => {
+    assert.equal(projectFieldQueryToken("Story Points"), "story-points");
+  });
+});
