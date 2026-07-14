@@ -2,6 +2,7 @@ import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import {
   assertAllowedProjectNumber,
+  buildRules,
   DEFAULT_ALLOWED_PROJECT_NUMBER,
   findCurrentSprint,
   findNextSprint,
@@ -133,4 +134,34 @@ describe("projectFieldQueryToken", () => {
   test("fallback field name should become the Projects search token", () => {
     assert.equal(projectFieldQueryToken("Story Points"), "story-points");
   });
+});
+
+describe("buildRules ignore label", () => {
+  const config = {
+    projectId: "PROJECT_ID",
+    sprintField: { id: "SPRINT_FIELD" },
+    statusField: { id: "STATUS_FIELD" },
+    needsRefinementOption: { id: "OPTION_ID", name: "🛠️ Needs Refinement" },
+    storyPointsField: { name: "Story Points (Number)" },
+  };
+  const sprints = {
+    current: { id: "s1", title: "Sprint 1" },
+    next: { id: "s2", title: "Sprint 2" },
+  };
+  const rules = buildRules(config, sprints);
+
+  test("builds all three hygiene rules", () => {
+    assert.equal(rules.length, 3);
+  });
+
+  // Every rule must opt out issues carrying the ignore label, quoted because
+  // the label contains a slash.
+  for (const rule of rules) {
+    test(`"${rule.name}" excludes the sprint-hygiene/ignore label`, () => {
+      assert.ok(
+        rule.filter.includes(`-label:"sprint-hygiene/ignore"`),
+        `filter: ${rule.filter}`,
+      );
+    });
+  }
 });

@@ -77,6 +77,7 @@ export function findCurrentSprint(iterations, today) {
 
 const EXCLUDED_STATUSES = ["done", "closed"];
 const SPRINT_ASSIGN_STATUSES = ["needs refinement", "todo"];
+const IGNORE_LABEL = "sprint-hygiene/ignore";
 const STATUS_FIELD_NAME = "Status";
 const SPRINT_FIELD_NAME = "Sprint";
 const STORY_POINTS_FIELD_NAMES = ["Story Points (Number)", "Story Points"];
@@ -549,7 +550,7 @@ function plannedAction(rule, item) {
     };
 }
 
-function buildRules(config, sprints) {
+export function buildRules(config, sprints) {
     // Each rule decides where it moves items. Active work rolling off an expired
     // sprint belongs in the *current* sprint so it stays on the active board,
     // while refinement work is planned ahead in the *next* sprint.
@@ -569,11 +570,14 @@ function buildRules(config, sprints) {
         option: config.needsRefinementOption,
     });
 
+    // Items carrying this label are opted out of all sprint hygiene rules.
+    const ignoreLabelFilter = `-label:${quoteProjectFilterValue(IGNORE_LABEL)}`;
+
     return [
         {
             name: "Roll expired sprint items forward",
             // Project filter: open issues with any sprint before the current sprint.
-            filter: "is:open -is:draft sprint:<@current",
+            filter: `is:open -is:draft sprint:<@current ${ignoreLabelFilter}`,
             // Item checks: keep all non-terminal items, regardless of active status.
             // This includes ToDo, Next-UP, In Progress, Review, and QA work whose
             // sprint is already in the past.
@@ -598,6 +602,7 @@ function buildRules(config, sprints) {
                 "sprint:>=@current",
                 `no:${projectFieldQueryToken(config.storyPointsField?.name ?? STORY_POINTS_FIELD_NAMES[0])}`,
                 `-status:${quoteProjectFilterValue(config.needsRefinementOption.name)}`,
+                ignoreLabelFilter,
             ].join(" "),
             skipReason: config.storyPointsField ? null : "no story points field found on project",
             // Item checks: only unsized backlog/refinement candidates. This avoids
@@ -627,6 +632,7 @@ function buildRules(config, sprints) {
                 "-is:draft",
                 "sprint:@current",
                 `status:${quoteProjectFilterValue(config.needsRefinementOption.name)}`,
+                ignoreLabelFilter,
             ].join(" "),
             // Item checks: keep the status check as a defensive fallback in case
             // Project search semantics change.
