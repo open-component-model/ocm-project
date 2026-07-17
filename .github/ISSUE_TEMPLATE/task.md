@@ -2,7 +2,7 @@
 name: Task / Backlog Item
 about: Create a Task / Backlog Item to be worked on
 title: ''
-labels: kind/task
+type: Task
 assignees: ''
 
 ---
@@ -10,6 +10,7 @@ assignees: ''
 **Description**
 
 **Done Criteria**
+
 - [ ] ...
 - [ ] Code has been reviewed by other team members
 - [ ] Analysis of existing tests (Unit and Integration)

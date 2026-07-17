@@ -2,7 +2,7 @@
 name: Epic Template
 about: Template for a new Epic
 title: 'EPIC: '
-labels: kind/epic
+type: Epic
 assignees: ''
 
 ---
@@ -15,6 +15,7 @@ As a DevOps admin, I want to ...
 
 **Scope**
 List all deliverables that are part of this epic. The Epic is considered DONE if all of the below mentioned deliverables are available.
+
 - [ ] Function 1
 - [ ] Function 2
 - [ ] Tests
@@ -24,4 +25,3 @@ List all deliverables that are part of this epic. The Epic is considered DONE if
 
 **Out of Scope**
 List features or implementation strategies that shouldn't be considered in this iteration.
-
