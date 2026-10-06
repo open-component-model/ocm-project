@@ -166,16 +166,11 @@ describe("buildRules ignore label", () => {
     });
   }
 
-  // Draft issues support only a Sprint field write, so just the roll-forward
-  // rule includes them; the other two keep `-is:draft` server-side.
-  test("roll-forward rule includes drafts, others exclude them", () => {
+  // Draft issues are treated like issues, so no rule filters them out
+  // server-side. Writes a draft can't support (comments) no-op individually.
+  test("no rule excludes drafts", () => {
     for (const rule of rules) {
-      const includesDrafts = !rule.filter.includes("-is:draft");
-      assert.equal(
-        includesDrafts,
-        rule.name === "Roll expired sprint items forward",
-        `filter: ${rule.filter}`,
-      );
+      assert.ok(!rule.filter.includes("-is:draft"), `filter: ${rule.filter}`);
     }
   });
 });

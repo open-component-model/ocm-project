@@ -314,8 +314,8 @@ async function fetchProjectConfig(github, core, {org, projectNumber}) {
 /**
  * Fetch all project items matching the server-side filter (paginated).
  * Pull requests and other non-issue items are dropped and reported
- * separately. Draft issues are kept; whether a rule sees them is controlled by
- * its own `-is:draft` server-side filter.
+ * separately. Draft issues are kept and treated like issues; writes a draft
+ * can't support (e.g. comments) no-op individually.
  *
  * @param {{ graphql: Function }} github - GitHub GraphQL client
  * @param {{ info: Function }} core - Logger compatible with @actions/core
@@ -580,8 +580,6 @@ export function buildRules(config, sprints) {
         {
             name: "Roll expired sprint items forward",
             // Project filter: open items with any sprint before the current sprint.
-            // Drafts are included (no `-is:draft`): rolling the Sprint field
-            // forward is the only write this rule makes, which drafts support.
             filter: `is:open sprint:<@current ${ignoreLabelFilter}`,
             // Item checks: keep all non-terminal items, regardless of active status.
             // This includes ToDo, Next-UP, In Progress, Review, and QA work whose
@@ -597,13 +595,12 @@ export function buildRules(config, sprints) {
         },
         {
             name: "Mark unestimated items for refinement",
-            // Project filter: only open, unestimated issues with a current or
+            // Project filter: only open, unestimated items with a current or
             // upcoming sprint. Items without a sprint are ignored by default to avoid
             // pulling the whole backlog into planning. Already-refinement items are
             // excluded server-side because they already have the target status.
             filter: [
                 "is:open",
-                "-is:draft",
                 "sprint:>=@current",
                 `no:${projectFieldQueryToken(config.storyPointsField?.name ?? STORY_POINTS_FIELD_NAMES[0])}`,
                 `-status:${quoteProjectFilterValue(config.needsRefinementOption.name)}`,
@@ -629,12 +626,11 @@ export function buildRules(config, sprints) {
         },
         {
             name: "Move refinement work to planning sprint",
-            // Project filter: open Needs Refinement issues currently assigned to the
+            // Project filter: open Needs Refinement items currently assigned to the
             // active sprint. Next-UP stays in @current because it represents planned
             // current-sprint backlog.
             filter: [
                 "is:open",
-                "-is:draft",
                 "sprint:@current",
                 `status:${quoteProjectFilterValue(config.needsRefinementOption.name)}`,
                 ignoreLabelFilter,
