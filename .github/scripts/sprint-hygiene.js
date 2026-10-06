@@ -313,7 +313,9 @@ async function fetchProjectConfig(github, core, {org, projectNumber}) {
 
 /**
  * Fetch all project items matching the server-side filter (paginated).
- * Non-issue items (draft issues, PRs) are dropped and reported separately.
+ * Pull requests and other non-issue items are dropped and reported
+ * separately. Draft issues are kept; whether a rule sees them is controlled by
+ * its own `-is:draft` server-side filter.
  *
  * @param {{ graphql: Function }} github - GitHub GraphQL client
  * @param {{ info: Function }} core - Logger compatible with @actions/core
@@ -339,7 +341,8 @@ async function fetchItems(github, core, {projectId, filter}) {
             core.info(`Matched items (server-side): ${totalCount}`);
         }
         for (const item of nodes) {
-            if (item.content?.__typename === "Issue") {
+            const kind = item.content?.__typename;
+            if (kind === "Issue" || kind === "DraftIssue") {
                 items.push(item);
             } else {
                 droppedProjectItems.push(item);
@@ -576,8 +579,10 @@ export function buildRules(config, sprints) {
     return [
         {
             name: "Roll expired sprint items forward",
-            // Project filter: open issues with any sprint before the current sprint.
-            filter: `is:open -is:draft sprint:<@current ${ignoreLabelFilter}`,
+            // Project filter: open items with any sprint before the current sprint.
+            // Drafts are included (no `-is:draft`): rolling the Sprint field
+            // forward is the only write this rule makes, which drafts support.
+            filter: `is:open sprint:<@current ${ignoreLabelFilter}`,
             // Item checks: keep all non-terminal items, regardless of active status.
             // This includes ToDo, Next-UP, In Progress, Review, and QA work whose
             // sprint is already in the past.

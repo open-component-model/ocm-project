@@ -1,6 +1,7 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  applySprintHygienePlan,
   assertAllowedProjectNumber,
   buildRules,
   DEFAULT_ALLOWED_PROJECT_NUMBER,
@@ -164,4 +165,93 @@ describe("buildRules ignore label", () => {
       );
     });
   }
+
+  // Draft issues support only a Sprint field write, so just the roll-forward
+  // rule includes them; the other two keep `-is:draft` server-side.
+  test("roll-forward rule includes drafts, others exclude them", () => {
+    for (const rule of rules) {
+      const includesDrafts = !rule.filter.includes("-is:draft");
+      assert.equal(
+        includesDrafts,
+        rule.name === "Roll expired sprint items forward",
+        `filter: ${rule.filter}`,
+      );
+    }
+  });
+});
+
+describe("applySprintHygienePlan with a draft item", () => {
+  // A draft project item has no underlying issue: no content.id, number, url,
+  // or state. The roll-forward rule still produces a setSprint mutation for it.
+  // This mirrors what plannedAction builds for a draft (issueId resolves null).
+  const draftAction = {
+    rule: "Roll expired sprint items forward",
+    item: {
+      projectItemId: "PVTI_draft",
+      issueId: null,
+      number: null,
+      title: "Spike on Staging Service V2 upgrade",
+      url: null,
+      state: null,
+      status: "🏗 In Progress",
+      sprint: "Sprint 72",
+      storyPoints: 5,
+    },
+    description: "Sprint: Sprint 72 -> Sprint 73",
+    commentBody: "Sprint hygiene: automatically moved ...",
+    mutation: {
+      type: "setSprint",
+      projectId: "PROJECT_ID",
+      itemId: "PVTI_draft",
+      fieldId: "SPRINT_FIELD",
+      iterationId: "s1",
+    },
+  };
+  const plan = {
+    rules: [
+      {name: "Roll expired sprint items forward", skipped: false, actions: [draftAction]},
+    ],
+  };
+  const noopCore = {info() {}, warning() {}, setFailed() {}};
+
+  const makeGithub = () => {
+    const calls = [];
+    return {
+      calls,
+      graphql(query, vars) {
+        calls.push({query, vars});
+        return Promise.resolve({});
+      },
+    };
+  };
+
+  test("writes the Sprint field and attempts no comment for a draft", async () => {
+    const github = makeGithub();
+    const results = await applySprintHygienePlan({github, core: noopCore, plan});
+
+    assert.deepEqual(results, [
+      {name: "Roll expired sprint items forward", processed: 1, failed: 0},
+    ]);
+    // Exactly one GraphQL call: the Sprint update. No addComment, because a
+    // draft has no issueId for tryAddComment to target.
+    assert.equal(github.calls.length, 1);
+    assert.deepEqual(github.calls[0].vars, {
+      projectId: "PROJECT_ID",
+      itemId: "PVTI_draft",
+      fieldId: "SPRINT_FIELD",
+      iterationId: "s1",
+    });
+    assert.match(github.calls[0].query, /updateProjectV2ItemFieldValue/);
+    assert.doesNotMatch(github.calls[0].query, /addComment/);
+  });
+
+  test("dry run writes nothing", async () => {
+    const github = makeGithub();
+    const results = await applySprintHygienePlan({github, core: noopCore, plan, dryRun: true});
+
+    assert.deepEqual(results, [
+      {name: "Roll expired sprint items forward", processed: 1, failed: 0},
+    ]);
+    assert.equal(github.calls.length, 0);
+  });
 });
