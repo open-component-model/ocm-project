@@ -13,6 +13,9 @@
   "dependencies": {
     "@octokit/graphql": "9.0.3"
   },
+  "overrides": {
+    "brace-expansion": "^5.0.12"
+  },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "eslint": "^10.6.0",
