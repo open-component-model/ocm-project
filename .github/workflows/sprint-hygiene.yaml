@@ -28,15 +28,20 @@ jobs:
     name: Sprint hygiene
     runs-on: ubuntu-24.04-arm
     environment:
-      name: automations
+      name: project-board
       deployment: false
     steps:
       - name: Generate App Token
         id: get_token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          app-id: ${{ secrets.OCMBOT_APP_ID }}
-          private-key: ${{ secrets.OCMBOT_PRIV_KEY }}
+          client-id: ${{ secrets.PROJECT_BOT_CLIENT_ID }}
+          private-key: ${{ secrets.PROJECT_BOT_PRIVATE_KEY }}
+          # Project items come from many repos in the org, so the token must
+          # cover every repo of the installation, not only this one.
+          owner: ${{ github.repository_owner }}
+          permission-organization-projects: write
+          permission-issues: write
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
